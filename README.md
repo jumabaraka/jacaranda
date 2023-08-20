@@ -252,7 +252,9 @@ def load_data():
   transformed_data = transform_data(data)
 
   # Load the transformed data into the database
-  load
+  load_data_to_db(transformed_data)
+
+  return jsonify({'message': 'Data loaded successfully'})
 ```
 
 The `load_data()` function is a Flask API route that handles the `/api/load_data` endpoint. It performs the following steps:
