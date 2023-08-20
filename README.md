@@ -12,19 +12,55 @@ https://jacaranda-api-service-5tjbz6c3na-ew.a.run.app/api/load_data
 
 ```
 https://jacaranda-api-service-5tjbz6c3na-ew.a.run.app/api/all
+
 ```
+
+# Screenshots
+
+### Load data
+
+![Alt text](image-1.png)
+
+### Retreive all data
+
+![Alt text](image-2.png)
+
+### Building docker image (Cloud build)
+
+![Alt text](image-6.png)
+
+### Stored docker image (Cloud Artifact)
+
+![Alt text](image-3.png)
+
+### Jacaranda-are-service (Cloud run)
+
+![Alt text](image-4.png)
+
+![Alt text](image-5.png)
+
+### Amazon RDS DB
+
+![Alt text](image-7.png)
+
+## Cron job Scheduler by (cloud scheduler)
+
+![Alt text](image.png)
+
+# Initial Setup
 
 ### Install the required dependencies:
 
 - Install Python and pip.
 - Install the psycopg2 library: `pip install psycopg2`.
+- Install other dependencies: `pip install -r requirements.txt`
 
 ### Set the environment variables:
 
 - Set the `DB_USERNAME` environment variable to the username for your PostgreSQL database.
 - Set the `DB_PASSWORD` environment variable to the password for your PostgreSQL database.
 
-[Title](apps/api/mentors/init_db.py)
+[apps/api/mentors/init_db.py](apps/api/mentors/init_db.py)
 
 ## This mentor checklist database is hosted on Amazon RDS.
 
@@ -76,7 +112,7 @@ Ensure that you have an active internet connection and the necessary permissions
 
 Remember to securely manage your database credentials and connection details, as they contain sensitive information.
 
-[Title](apps/api/mentors/app.py)
+[apps/api/mentors/app.py](apps/api/mentors/app.py)
 
 ### `get_db_connection()`
 
@@ -110,6 +146,38 @@ This method reads data from the specified sheet in the Excel file (`mentor_check
 ```python
 def transform_data(df):
   # Rename the columns of the dataframe to match the table structure
+  df.rename(columns={
+    'ID': 'id',
+    'CME Completion Date': 'cme_completion_date',
+    'CME Topic': 'cme_topic',
+    'CME Unique ID': 'cme_unique_id',
+    'County': 'county',
+    'Date Submitted': 'date_submitted',
+    'Drill Topic': 'drill_topic',
+    'Drill Unique ID': 'drill_unique_id',
+    'Essential CME Topic': 'essential_cme_topic',
+    'Essential Drill Topic': 'essential_drill_topic',
+    'Facility Code': 'facility_code',
+    'Facility Name': 'facility_name',
+    'ID Number CME': 'id_number_cme',
+    'ID Number Drill': 'id_number_drill',
+    'Mentor Name': 'mentor_name',
+    'Submission ID': 'submission_id',
+    'Success Story': 'success_story'
+  }, inplace=True)
+
+   # Convert the date columns to proper date format
+  df['cme_completion_date'] = pd.to_datetime(df['cme_completion_date'])
+  df['date_submitted'] = pd.to_datetime(df['date_submitted'])
+
+  # Transform the data to fit into the table structure
+  transformed_df = df[[
+    'id', 'cme_completion_date', 'cme_topic', 'cme_unique_id', 'county', 'date_submitted', 'drill_topic',
+    'drill_unique_id', 'essential_cme_topic', 'essential_drill_topic', 'facility_code', 'facility_name',
+    'id_number_cme', 'id_number_drill', 'mentor_name', 'submission_id', 'success_story'
+  ]]
+
+  return transformed_df
 ```
 
 In the `transform_data` method, we pass the data obtained from the `load_data_from_sheet` method and transform it to match the structure of the `mentor_checklist` table in the database. The method performs the following steps:
@@ -136,7 +204,31 @@ def load_data_to_db(data):
         drill_unique_id, essential_cme_topic, essential_drill_topic, facility_code, facility_name,
         id_number_cme, id_number_drill, mentor_name, submission_id, success_story
     ) VALUES (
-        %s, %s, %s, %s, %s, %s, %s, %s, %
+      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+    )
+  """
+  # Load the data into the table
+  for row in data.itertuples(index=False):
+    values = (
+      row.id, row.cme_completion_date, row.cme_topic, row.cme_unique_id, row.county, row.date_submitted,
+      row.drill_topic, row.drill_unique_id, row.essential_cme_topic, row.essential_drill_topic,
+      row.facility_code, row.facility_name, row.id_number_cme, row.id_number_drill, row.mentor_name,
+      row.submission_id, row.success_story
+    )
+
+    # Check if the record already exists in the table based on the id
+    select_query = "SELECT COUNT(*) FROM mentor_checklist WHERE id = %s"
+    cursor.execute(select_query, (row.id,))
+    result = cursor.fetchone()[0]
+    if result == 0:  # If record does not exist, insert it into the table
+      cursor.execute(insert_query, values)
+
+  # Commit the changes
+  conn.commit()
+
+  # Close the cursor and connection
+  cursor.close()
+  conn.close()
 ```
 
 In the `load_data_to_db` method, we pass the transformed data and load it into the PostgreSQL database. The method performs the following steps:
@@ -147,16 +239,6 @@ In the `load_data_to_db` method, we pass the transformed data and load it into t
 4. Iterates over each row in the transformed data and inserts it into the table if the record does not already exist.
 5. Commits the changes to the database.
 6. Closes the cursor and connection.
-
-### `hello()`
-
-```python
-@app.route('/')
-def hello():
-  return '<h1>Hello from Flask & Docker</h2>'
-```
-
-This Flask route handler function returns a simple HTML message of "Hello from Flask & Docker". It acts as a basic endpoint for testing the Flask application.
 
 ### `load_data()`
 
@@ -229,7 +311,7 @@ This will return all the records in the database as a JSON response.
 
 ## Dockerfile
 
-[Title](apps/api/mentors/Dockerfile)
+[apps/api/mentors/Dockerfile](apps/api/mentors/Dockerfile)
 
 ```docker
 # start by pulling the python image
@@ -264,7 +346,7 @@ CMD [ "flask", "run","--host","0.0.0.0","--port","5000"]
 
 ## Build the docker image in GCP Cloud Build and deploying to Cloud run
 
-[Title](apps/api/mentors/cloudbuild.yaml)
+[apps/api/mentors/cloudbuild.yaml](apps/api/mentors/cloudbuild.yaml)
 
 ```
 
@@ -283,37 +365,10 @@ images:
 ## Build the Docker image, push it to cloud artifact then deploy to cloud run:
 
 ```
-gcloud builds submit --tag gcr.io/cloud-builders/docker .
+gcloud builds submit --config cloudbuild.yaml.
 ```
 
 ## Cron job
 
 I am using Cloud Scheduler
 ![Alt text](image.png)
-
-# Screenshots
-
-### Load data
-
-![Alt text](image-1.png)
-
-### Retreive all data
-
-![Alt text](image-2.png)
-
-Building docker image
-![Alt text](image-6.png)
-
-### Stored docker image
-
-![Alt text](image-3.png)
-
-### Jacaranda-are-service Cloud run
-
-![Alt text](image-4.png)
-
-![Alt text](image-5.png)
-
-### Amazon RDS DB
-
-![Alt text](image-7.png)
