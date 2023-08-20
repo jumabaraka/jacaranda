@@ -1,0 +1,9 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'europe-west1-docker.pkg.dev/$PROJECT_ID/project-dash/jacaranda:tag0.0.1', '.' ]
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['run', 'deploy', 'jacaranda-api-service', '--image', 'europe-west1-docker.pkg.dev/$PROJECT_ID/project-dash/jacaranda:tag0.0.1', '--region', 'europe-west1']
+
+images:
+- 'europe-west1-docker.pkg.dev/$PROJECT_ID/project-dash/jacaranda:tag0.0.1'
